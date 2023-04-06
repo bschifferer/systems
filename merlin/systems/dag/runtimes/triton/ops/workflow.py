@@ -86,7 +86,7 @@ class TransformWorkflowTriton(TritonOperator):
             self._nvt_model_name,
             transformable,
             self.input_schema.column_names,
-            self.output_schema.column_names,
+            _schema_to_column_names(self.output_schema),
         )
 
         inference_response = inference_request.exec()
@@ -99,7 +99,7 @@ class TransformWorkflowTriton(TritonOperator):
             )
 
         return triton_response_to_tensor_table(
-            inference_response, type(transformable), self.output_schema.column_names
+            inference_response, type(transformable), _schema_to_column_names(self.output_schema)
         )
 
     @classmethod
@@ -299,3 +299,30 @@ def _generate_nvtabular_config(
     with open(os.path.join(output_path, "config.pbtxt"), "w", encoding="utf-8") as o:
         text_format.PrintMessage(config, o)
     return config
+
+
+def _schema_to_column_names(schema):
+    """Converts a Schema into a list of column names.
+
+    It converts a list column into two column names with post_fix
+    __values and __offsets
+
+    Parameters
+    ----------
+    schema:
+        Schema Object
+
+    Returns
+    -------
+    column_names:
+        a list of column names
+    """
+    column_names = []
+    for column_name in schema.column_names:
+        column = schema.select_by_name(column_name).first
+        if column.is_list:
+            column_names.append(column_name + "__values")
+            column_names.append(column_name + "__offsets")
+        else:
+            column_names.append(column_name)
+    return column_names
